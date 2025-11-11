@@ -28,47 +28,65 @@ class VasilievMVecSignsFuncTests : public ppc::util::BaseRunFuncTests<InType, Ou
 
  protected:
   void SetUp() override {
-    int width = -1;
-    int height = -1;
-    int channels = -1;
-    std::vector<uint8_t> img;
-    // Read image
-    {
-      std::string abs_path = ppc::util::GetAbsoluteTaskPath(PPC_ID_vasiliev_m_vec_signs, "pic.jpg");
-      auto *data = stbi_load(abs_path.c_str(), &width, &height, &channels, 0);
-      if (data == nullptr) {
-        throw std::runtime_error("Failed to load image: " + std::string(stbi_failure_reason()));
-      }
-      img = std::vector<uint8_t>(data, data + (static_cast<ptrdiff_t>(width * height * channels)));
-      stbi_image_free(data);
-      if (std::cmp_not_equal(width, height)) {
-        throw std::runtime_error("width != height: ");
-      }
+    std::string abs_path = ppc::util::GetAbsoluteTaskPath(PPC_ID_vasiliev_m_vec_signs, "test_vectors.txt");
+    std::ifstream file(abs_path);
+    if (!file.is_open()) {
+      throw std::runtime_error("Wrong path.");
     }
 
-    TestType params = std::get<static_cast<std::size_t>(ppc::util::GTestParamIndex::kTestParams)>(GetParam());
-    input_data_ = width - height + std::min(std::accumulate(img.begin(), img.end(), 0), channels);
+    test_vectors_.clear();
+    std::string line;
+    while (std::getline(file, line)) {
+      if (line.empty()) continue;
+
+      std::stringstream ss(line);
+      std::vector<int> vec;
+      int val;
+      while (ss >> val) {
+        vec.push_back(val);
+        ss >> std::ws;
+        if (ss.peek() == ';') {
+          ss.get();
+          break;
+        }
+      }
+
+      int expected = 0;
+      ss >> expected;
+      test_vectors_.push_back({vec, expected});
+    }
   }
 
   bool CheckTestOutputData(OutType &output_data) final {
-    return (input_data_ == output_data);
+    return expected_output_== output_data;
   }
 
   InType GetTestInputData() final {
+    TestType params = std::get<static_cast<std::size_t>(ppc::util::GTestParamIndex::kTestParams)>(GetParam());
+    int index = std::get<0>(params);
+    input_data_ = test_vectors_[index].first;
+    expected_output_ = test_vectors_[index].second;
     return input_data_;
   }
 
  private:
-  InType input_data_ = 0;
+  std::vector<std::pair<std::vector<int>, int>> test_vectors_;
+  InType input_data_;
+  OutType expected_output_;
 };
 
 namespace {
 
-TEST_P(VasilievMVecSignsFuncTests, MatmulFromPic) {
+TEST_P(VasilievMVecSignsFuncTests, AlternationsInVector) {
   ExecuteTest(GetParam());
 }
 
-const std::array<TestType, 3> kTestParam = {std::make_tuple(3, "3"), std::make_tuple(5, "5"), std::make_tuple(7, "7")};
+const std::array<TestType, 5> kTestParam = {
+    std::make_tuple(0, "case1"),
+    std::make_tuple(1, "case2"),
+    std::make_tuple(2, "case3"),
+    std::make_tuple(3, "case4"),
+    std::make_tuple(4, "case5")};
 
 const auto kTestTasksList =
     std::tuple_cat(ppc::util::AddFuncTask<VasilievMVecSignsMPI, InType>(kTestParam, PPC_SETTINGS_vasiliev_m_vec_signs),
@@ -78,7 +96,7 @@ const auto kGtestValues = ppc::util::ExpandToValues(kTestTasksList);
 
 const auto kPerfTestName = VasilievMVecSignsFuncTests::PrintFuncTestName<VasilievMVecSignsFuncTests>;
 
-INSTANTIATE_TEST_SUITE_P(PicMatrixTests, VasilievMVecSignsFuncTests, kGtestValues, kPerfTestName);
+INSTANTIATE_TEST_SUITE_P(SignAlternationsTests, VasilievMVecSignsFuncTests, kGtestValues, kPerfTestName);
 
 }  // namespace
 

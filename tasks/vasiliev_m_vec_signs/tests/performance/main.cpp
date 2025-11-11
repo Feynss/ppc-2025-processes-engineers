@@ -8,18 +8,47 @@
 namespace vasiliev_m_vec_signs {
 
 class VasilievMVecSignsPerfTests : public ppc::util::BaseRunPerfTests<InType, OutType> {
-  const int kCount_ = 100;
-  InType input_data_{};
+  std::vector<std::pair<std::vector<int>, int>> test_vectors_;
+  InType input_data_;
+  OutType expected_output_;
 
   void SetUp() override {
-    input_data_ = kCount_;
+    std::string abs_path = ppc::util::GetAbsoluteTaskPath(PPC_ID_vasiliev_m_vec_signs, "perf_test_vector.txt");
+    std::ifstream file(abs_path);
+    if (!file.is_open()) {
+      throw std::runtime_error("Wrong path.");
+    }
+
+    test_vectors_.clear();
+    std::string line;
+    while (std::getline(file, line)) {
+      if (line.empty()) continue;
+
+      std::stringstream ss(line);
+      std::vector<int> vec;
+      int val;
+      while (ss >> val) {
+        vec.push_back(val);
+        ss >> std::ws;
+        if (ss.peek() == ';') {
+          ss.get();
+          break;
+        }
+      }
+
+      int expected = 0;
+      ss >> expected;
+      test_vectors_.push_back({vec, expected});
+    }
   }
 
   bool CheckTestOutputData(OutType &output_data) final {
-    return input_data_ == output_data;
+    return expected_output_ == output_data;
   }
 
   InType GetTestInputData() final {
+    input_data_ = test_vectors_[0].first;
+    expected_output_ = test_vectors_[0].second;
     return input_data_;
   }
 };

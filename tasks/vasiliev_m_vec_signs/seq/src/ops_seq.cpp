@@ -11,50 +11,34 @@ namespace vasiliev_m_vec_signs {
 VasilievMVecSignsSEQ::VasilievMVecSignsSEQ(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
   GetInput() = in;
-  GetOutput() = 0;
+  GetOutput() = OutType{};
 }
 
 bool VasilievMVecSignsSEQ::ValidationImpl() {
-  return (GetInput() > 0) && (GetOutput() == 0);
+  return !GetInput().empty();
 }
 
 bool VasilievMVecSignsSEQ::PreProcessingImpl() {
-  GetOutput() = 2 * GetInput();
-  return GetOutput() > 0;
+  GetOutput() = 0;
+  return true;
 }
 
 bool VasilievMVecSignsSEQ::RunImpl() {
-  if (GetInput() == 0) {
-    return false;
-  }
+  auto &vec = GetInput();
+  int alters = 0;
 
-  for (InType i = 0; i < GetInput(); i++) {
-    for (InType j = 0; j < GetInput(); j++) {
-      for (InType k = 0; k < GetInput(); k++) {
-        std::vector<InType> tmp(i + j + k, 1);
-        GetOutput() += std::accumulate(tmp.begin(), tmp.end(), 0);
-        GetOutput() -= i + j + k;
-      }
+  for (size_t i = 0; i < (vec.size() - 1); i++) {
+    if ((vec[i] > 0 && vec[i + 1] < 0) || (vec[i] < 0 && vec[i + 1] > 0)) {
+      alters++;
     }
   }
 
-  const int num_threads = ppc::util::GetNumThreads();
-  GetOutput() *= num_threads;
-
-  int counter = 0;
-  for (int i = 0; i < num_threads; i++) {
-    counter++;
-  }
-
-  if (counter != 0) {
-    GetOutput() /= counter;
-  }
-  return GetOutput() > 0;
+  GetOutput() = alters;
+  return true;
 }
 
 bool VasilievMVecSignsSEQ::PostProcessingImpl() {
-  GetOutput() -= GetInput();
-  return GetOutput() > 0;
+  return GetOutput() >= 0;
 }
 
 }  // namespace vasiliev_m_vec_signs
