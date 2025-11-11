@@ -3,8 +3,8 @@
 #include <numeric>
 #include <vector>
 
-#include "vasiliev_m_vec_signs/common/include/common.hpp"
 #include "util/include/util.hpp"
+#include "vasiliev_m_vec_signs/common/include/common.hpp"
 
 namespace vasiliev_m_vec_signs {
 

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "vasiliev_m_vec_signs/common/include/common.hpp"
 #include "task/include/task.hpp"
+#include "vasiliev_m_vec_signs/common/include/common.hpp"
 
 namespace vasiliev_m_vec_signs {
 

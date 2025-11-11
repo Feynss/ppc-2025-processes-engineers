@@ -5,8 +5,8 @@
 #include <numeric>
 #include <vector>
 
-#include "vasiliev_m_vec_signs/common/include/common.hpp"
 #include "util/include/util.hpp"
+#include "vasiliev_m_vec_signs/common/include/common.hpp"
 
 namespace vasiliev_m_vec_signs {
 
@@ -39,21 +39,20 @@ bool VasilievMVecSignsMPI::RunImpl() {
   for (int i = 0; i < remain; i++) {
     counts[i]++;
   }
-  
+
   std::vector<int> displs(size, 0);
   for (int i = 1; i < size; i++) {
     displs[i] = displs[i - 1] + counts[i - 1];
   }
-  
+
   std::vector<int> local_data(counts[rank]);
-  MPI_Scatterv(vec.data(), counts.data(), displs.data(), MPI_INT,
-              local_data.data(), counts[rank], MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Scatterv(vec.data(), counts.data(), displs.data(), MPI_INT, local_data.data(), counts[rank], MPI_INT, 0,
+               MPI_COMM_WORLD);
 
   int local_count = 0;
 
   for (size_t i = 0; i < local_data.size() - 1; i++) {
-    if ((local_data[i] > 0 && local_data[i + 1] < 0) ||
-        (local_data[i] < 0 && local_data[i + 1] > 0)) {
+    if ((local_data[i] > 0 && local_data[i + 1] < 0) || (local_data[i] < 0 && local_data[i + 1] > 0)) {
       local_count++;
     }
   }

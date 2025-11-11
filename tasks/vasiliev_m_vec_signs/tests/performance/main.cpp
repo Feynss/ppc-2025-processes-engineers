@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
 
+#include "util/include/perf_test_util.hpp"
 #include "vasiliev_m_vec_signs/common/include/common.hpp"
 #include "vasiliev_m_vec_signs/mpi/include/ops_mpi.hpp"
 #include "vasiliev_m_vec_signs/seq/include/ops_seq.hpp"
-#include "util/include/perf_test_util.hpp"
 
 namespace vasiliev_m_vec_signs {
 
@@ -22,7 +22,9 @@ class VasilievMVecSignsPerfTests : public ppc::util::BaseRunPerfTests<InType, Ou
     test_vectors_.clear();
     std::string line;
     while (std::getline(file, line)) {
-      if (line.empty()) continue;
+      if (line.empty()) {
+        continue;
+      }
 
       std::stringstream ss(line);
       std::vector<int> vec;
