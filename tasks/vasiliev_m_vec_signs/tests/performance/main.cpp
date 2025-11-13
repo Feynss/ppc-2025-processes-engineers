@@ -1,5 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <fstream>
+#include <istream>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "util/include/perf_test_util.hpp"
 #include "vasiliev_m_vec_signs/common/include/common.hpp"
 #include "vasiliev_m_vec_signs/mpi/include/ops_mpi.hpp"
@@ -10,7 +18,7 @@ namespace vasiliev_m_vec_signs {
 class VasilievMVecSignsPerfTests : public ppc::util::BaseRunPerfTests<InType, OutType> {
   std::vector<std::pair<std::vector<int>, int>> test_vectors_;
   InType input_data_;
-  OutType expected_output_;
+  OutType expected_output_ = 0;
 
   void SetUp() override {
     std::string abs_path = ppc::util::GetAbsoluteTaskPath(PPC_ID_vasiliev_m_vec_signs, "perf_test_vector.txt");
@@ -28,7 +36,7 @@ class VasilievMVecSignsPerfTests : public ppc::util::BaseRunPerfTests<InType, Ou
 
       std::stringstream ss(line);
       std::vector<int> vec;
-      int val;
+      int val = 0;
       while (ss >> val) {
         vec.push_back(val);
         ss >> std::ws;
@@ -40,7 +48,7 @@ class VasilievMVecSignsPerfTests : public ppc::util::BaseRunPerfTests<InType, Ou
 
       int expected = 0;
       ss >> expected;
-      test_vectors_.push_back({vec, expected});
+      test_vectors_.emplace_back(vec, expected);
     }
   }
 

@@ -2,10 +2,9 @@
 
 #include <mpi.h>
 
-#include <numeric>
+#include <cstddef>
 #include <vector>
 
-#include "util/include/util.hpp"
 #include "vasiliev_m_vec_signs/common/include/common.hpp"
 
 namespace vasiliev_m_vec_signs {
@@ -27,7 +26,8 @@ bool VasilievMVecSignsMPI::PreProcessingImpl() {
 
 bool VasilievMVecSignsMPI::RunImpl() {
   auto &vec = GetInput();
-  int rank = 0, size = 1;
+  int rank = 0;
+  int size = 1;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
 

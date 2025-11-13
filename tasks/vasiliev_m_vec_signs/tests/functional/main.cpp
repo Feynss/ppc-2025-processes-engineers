@@ -1,11 +1,11 @@
 #include <gtest/gtest.h>
 #include <stb/stb_image.h>
 
-#include <algorithm>
 #include <array>
 #include <cstddef>
-#include <cstdint>
-#include <numeric>
+#include <fstream>
+#include <istream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -43,7 +43,7 @@ class VasilievMVecSignsFuncTests : public ppc::util::BaseRunFuncTests<InType, Ou
 
       std::stringstream ss(line);
       std::vector<int> vec;
-      int val;
+      int val = 0;
       while (ss >> val) {
         vec.push_back(val);
         ss >> std::ws;
@@ -55,7 +55,7 @@ class VasilievMVecSignsFuncTests : public ppc::util::BaseRunFuncTests<InType, Ou
 
       int expected = 0;
       ss >> expected;
-      test_vectors_.push_back({vec, expected});
+      test_vectors_.emplace_back(vec, expected);
     }
   }
 
@@ -74,7 +74,7 @@ class VasilievMVecSignsFuncTests : public ppc::util::BaseRunFuncTests<InType, Ou
  private:
   std::vector<std::pair<std::vector<int>, int>> test_vectors_;
   InType input_data_;
-  OutType expected_output_;
+  OutType expected_output_ = 0;
 };
 
 namespace {
