@@ -51,13 +51,26 @@ bool VasilievMVecSignsMPI::RunImpl() {
 
   int local_count = 0;
 
-  for (size_t i = 0; i < local_data.size() - 1; i++) {
-    if (SignChangeCheck(local_data[i], local_data[i + 1])) {
-      local_count++;
+  if (!local_data.empty()) {
+    for (size_t i = 0; i < local_data.size() - 1; i++) {
+      if (SignChangeCheck(local_data[i], local_data[i + 1])) {
+        local_count++;
+      }
     }
   }
 
-  BoundaryCheck(local_data, rank, size, local_count);
+  int first_elem = local_data.empty() ? 0 : local_data.front();
+  int last_elem  = local_data.empty() ? 0 : local_data.back();
+
+  int prev_last = 0;
+  if (rank > 0) {
+      MPI_Recv(&prev_last, 1, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      if (!local_data.empty() && SignChangeCheck(prev_last, first_elem)) local_count++;
+  }
+
+  if (rank < size - 1) {
+      MPI_Send(&last_elem, 1, MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
+  }
 
   int global_count = 0;
   MPI_Allreduce(&local_count, &global_count, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
@@ -69,27 +82,6 @@ bool VasilievMVecSignsMPI::RunImpl() {
 
 bool VasilievMVecSignsMPI::SignChangeCheck(int a, int b) {
   return (a > 0 && b < 0) || (a < 0 && b > 0);
-}
-
-void VasilievMVecSignsMPI::BoundaryCheck(std::vector<int> &local_data, int rank, int size, int &local_count) {
-  if (local_data.empty()) {
-    return;
-  }
-
-  int first_elem = local_data.front();
-  int last_elem = local_data.back();
-
-  int prev_last = 0;
-  if (rank > 0) {
-    MPI_Recv(&prev_last, 1, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    if (SignChangeCheck(prev_last, first_elem)) {
-      local_count++;
-    }
-  }
-
-  if (rank < size - 1) {
-    MPI_Send(&last_elem, 1, MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
-  }
 }
 
 bool VasilievMVecSignsMPI::PostProcessingImpl() {
