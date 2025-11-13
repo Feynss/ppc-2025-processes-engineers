@@ -1,6 +1,6 @@
 #include "vasiliev_m_vec_signs/seq/include/ops_seq.hpp"
 
-
+#include <cstddef>
 #include <vector>
 
 #include "vasiliev_m_vec_signs/common/include/common.hpp"
