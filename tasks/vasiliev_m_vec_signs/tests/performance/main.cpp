@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "util/include/perf_test_util.hpp"
+#include "util/include/util.hpp"
 #include "vasiliev_m_vec_signs/common/include/common.hpp"
 #include "vasiliev_m_vec_signs/mpi/include/ops_mpi.hpp"
 #include "vasiliev_m_vec_signs/seq/include/ops_seq.hpp"
