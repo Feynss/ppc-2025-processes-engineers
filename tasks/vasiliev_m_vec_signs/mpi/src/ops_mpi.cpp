@@ -60,16 +60,18 @@ bool VasilievMVecSignsMPI::RunImpl() {
   }
 
   int first_elem = local_data.empty() ? 0 : local_data.front();
-  int last_elem  = local_data.empty() ? 0 : local_data.back();
+  int last_elem = local_data.empty() ? 0 : local_data.back();
 
   int prev_last = 0;
   if (rank > 0) {
-      MPI_Recv(&prev_last, 1, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-      if (!local_data.empty() && SignChangeCheck(prev_last, first_elem)) local_count++;
+    MPI_Recv(&prev_last, 1, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    if (!local_data.empty() && SignChangeCheck(prev_last, first_elem)) {
+      local_count++;
+    }
   }
 
   if (rank < size - 1) {
-      MPI_Send(&last_elem, 1, MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
+    MPI_Send(&last_elem, 1, MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
   }
 
   int global_count = 0;
