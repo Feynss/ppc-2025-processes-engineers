@@ -97,6 +97,26 @@ const auto kPerfTestName = VasilievMVecSignsFuncTests::PrintFuncTestName<Vasilie
 
 INSTANTIATE_TEST_SUITE_P(SignAlternationsTests, VasilievMVecSignsFuncTests, kGtestValues, kPerfTestName);
 
+TEST(SignChangeCheckTests, PosToNeg) {
+  EXPECT_TRUE(vasiliev_m_vec_signs::VasilievMVecSignsMPI::SignChangeCheck(1, -1));
+}
+
+TEST(SignChangeCheckTests, NegToPos) {
+  EXPECT_TRUE(vasiliev_m_vec_signs::VasilievMVecSignsMPI::SignChangeCheck(-5, 3));
+}
+
+TEST(SignChangeCheckTests, NoChangePos) {
+  EXPECT_FALSE(vasiliev_m_vec_signs::VasilievMVecSignsMPI::SignChangeCheck(5, 8));
+}
+
+TEST(SignChangeCheckTests, NoChangeNeg) {
+  EXPECT_FALSE(vasiliev_m_vec_signs::VasilievMVecSignsMPI::SignChangeCheck(-4, -1));
+}
+
+TEST(SignChangeCheckTests, Zero) {
+  EXPECT_FALSE(vasiliev_m_vec_signs::VasilievMVecSignsMPI::SignChangeCheck(4, 0));
+}
+
 }  // namespace
 
 }  // namespace vasiliev_m_vec_signs

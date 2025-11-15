@@ -138,6 +138,7 @@ namespace vasiliev_m_vec_signs {
       return ppc::task::TypeOfTask::kMPI;
     }
     explicit VasilievMVecSignsMPI(const InType &in);
+    static bool SignChangeCheck(int a, int b); // отдельная функция для проверки двух соседних элементов
   
    private:
     bool ValidationImpl() override;
@@ -208,7 +209,7 @@ bool VasilievMVecSignsMPI::RunImpl() {
   // нахождение числа чередований в локальной части вектора
   if (!local_data.empty()) {
     for (size_t i = 0; i < local_data.size() - 1; i++) {
-      if ((local_data[i] > 0 && local_data[i + 1] < 0) || (local_data[i] < 0 && local_data[i + 1] > 0)) {
+      if (SignChangeCheck(local_data[i], local_data[i + 1])) {
         local_count++;
       }
     }
@@ -221,7 +222,7 @@ bool VasilievMVecSignsMPI::RunImpl() {
   int prev_last = 0;
   if (rank > 0) {
     MPI_Recv(&prev_last, 1, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    if (!local_data.empty() && ((prev_last > 0 && first_elem < 0) || (prev_last < 0 && first_elem > 0))) {
+    if (!local_data.empty() && SignChangeCheck(prev_last, first_elem)) {
       local_count++;
     }
   }
@@ -248,6 +249,14 @@ bool VasilievMVecSignsMPI::PostProcessingImpl() {
 }
 ```
 Проверка на неотрицательный результат (общее число чередований >= 0).
+
+### Вспомогательная функция
+```cpp
+bool VasilievMVecSignsMPI::SignChangeCheck(int a, int b) {
+  return (a > 0 && b < 0) || (a < 0 && b > 0);
+}
+```
+Проверка на чередование знаков соседних элементов вектора.
 
 ### Особые случаи
 В данном алгоритме предполагается, что нули в векторе не влияют на чередование (например, при векторе: `-4, 0, -2`; число чередований будет равняться `0`), поэтому сравнение соседних элементов в векторе - строгое.
@@ -509,6 +518,7 @@ class VasilievMVecSignsMPI : public BaseTask {
     return ppc::task::TypeOfTask::kMPI;
   }
   explicit VasilievMVecSignsMPI(const InType &in);
+  static bool SignChangeCheck(int a, int b);
 
  private:
   bool ValidationImpl() override;
@@ -579,7 +589,7 @@ bool VasilievMVecSignsMPI::RunImpl() {
 
   if (!local_data.empty()) {
     for (size_t i = 0; i < local_data.size() - 1; i++) {
-      if ((local_data[i] > 0 && local_data[i + 1] < 0) || (local_data[i] < 0 && local_data[i + 1] > 0)) {
+      if (SignChangeCheck(local_data[i], local_data[i + 1])) {
         local_count++;
       }
     }
@@ -591,7 +601,7 @@ bool VasilievMVecSignsMPI::RunImpl() {
   int prev_last = 0;
   if (rank > 0) {
     MPI_Recv(&prev_last, 1, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    if (!local_data.empty() && ((prev_last > 0 && first_elem < 0) || (prev_last < 0 && first_elem > 0))) {
+    if (!local_data.empty() && SignChangeCheck(prev_last, first_elem)) {
       local_count++;
     }
   }
@@ -606,6 +616,10 @@ bool VasilievMVecSignsMPI::RunImpl() {
   GetOutput() = global_count;
 
   return true;
+}
+
+bool VasilievMVecSignsMPI::SignChangeCheck(int a, int b) {
+  return (a > 0 && b < 0) || (a < 0 && b > 0);
 }
 
 bool VasilievMVecSignsMPI::PostProcessingImpl() {
@@ -717,6 +731,26 @@ const auto kGtestValues = ppc::util::ExpandToValues(kTestTasksList);
 const auto kPerfTestName = VasilievMVecSignsFuncTests::PrintFuncTestName<VasilievMVecSignsFuncTests>;
 
 INSTANTIATE_TEST_SUITE_P(SignAlternationsTests, VasilievMVecSignsFuncTests, kGtestValues, kPerfTestName);
+
+TEST(SignChangeCheckTests, PosToNeg) {
+  EXPECT_TRUE(vasiliev_m_vec_signs::VasilievMVecSignsMPI::SignChangeCheck(1, -1));
+}
+
+TEST(SignChangeCheckTests, NegToPos) {
+  EXPECT_TRUE(vasiliev_m_vec_signs::VasilievMVecSignsMPI::SignChangeCheck(-5, 3));
+}
+
+TEST(SignChangeCheckTests, NoChangePos) {
+  EXPECT_FALSE(vasiliev_m_vec_signs::VasilievMVecSignsMPI::SignChangeCheck(5, 8));
+}
+
+TEST(SignChangeCheckTests, NoChangeNeg) {
+  EXPECT_FALSE(vasiliev_m_vec_signs::VasilievMVecSignsMPI::SignChangeCheck(-4, -1));
+}
+
+TEST(SignChangeCheckTests, Zero) {
+  EXPECT_FALSE(vasiliev_m_vec_signs::VasilievMVecSignsMPI::SignChangeCheck(4, 0));
+}
 
 }  // namespace
 

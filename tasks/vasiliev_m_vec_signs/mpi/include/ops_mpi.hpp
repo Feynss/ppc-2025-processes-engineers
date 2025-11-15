@@ -11,6 +11,7 @@ class VasilievMVecSignsMPI : public BaseTask {
     return ppc::task::TypeOfTask::kMPI;
   }
   explicit VasilievMVecSignsMPI(const InType &in);
+  static bool SignChangeCheck(int a, int b);
 
  private:
   bool ValidationImpl() override;
