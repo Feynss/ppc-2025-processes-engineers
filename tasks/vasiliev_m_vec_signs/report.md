@@ -128,24 +128,25 @@ MPI-версия реализована классом `VasilievMVecSignsMPI`, �
 ## Структура класса
 ```cpp
 namespace vasiliev_m_vec_signs {
-   using InType = std::vector<int>;
-   using OutType = int;
-   using BaseTask = ppc::task::Task<InType, OutType>;
+  using InType = std::vector<int>;
+  using OutType = int;
+  using BaseTask = ppc::task::Task<InType, OutType>;
 
-   class VasilievMVecSignsMPI : public BaseTask {
-    public:
-     static constexpr ppc::task::TypeOfTask GetStaticTypeOfTask() {
-       return ppc::task::TypeOfTask::kMPI;
-     }
-     explicit VasilievMVecSignsMPI(const InType &in);
-   
-    private:
-     bool ValidationImpl() override;
-     bool PreProcessingImpl() override;
-     bool RunImpl() override;
-     bool PostProcessingImpl() override;
-   };
-} 
+  class VasilievMVecSignsMPI : public BaseTask {
+   public:
+    static constexpr ppc::task::TypeOfTask GetStaticTypeOfTask() {
+      return ppc::task::TypeOfTask::kMPI;
+    }
+    explicit VasilievMVecSignsMPI(const InType &in);
+  
+   private:
+    bool ValidationImpl() override;
+    bool PreProcessingImpl() override;
+    bool RunImpl() override;
+    bool PostProcessingImpl() override;
+    static bool SignChangeCheck(int a, int b);  // отдельная функция для проверки двух соседних элементов
+  };
+}
 ```
 ## Реализация методов
 ### Конструктор
@@ -206,37 +207,28 @@ bool VasilievMVecSignsMPI::RunImpl() {
   int local_count = 0;
 
   // нахождение числа чередований в локальной части вектора
-  for (size_t i = 0; i < local_data.size() - 1; i++) {
-    if ((local_data[i] > 0 && local_data[i + 1] < 0) ||
-        (local_data[i] < 0 && local_data[i + 1] > 0)) {
-      local_count++;
-    }
-  }
-
-  // проверка чередований между частями вектора
-  int last_elem = 0;
-  int first_elem = 0;
-  bool has_first = false;
-  bool has_last = false;
   if (!local_data.empty()) {
-    first_elem = local_data.front();
-    last_elem = local_data.back();
-    has_first = has_last = true;
-  }
-
-  int prev_last = 0;
-  if (rank > 0) {
-    MPI_Recv(&prev_last, 1, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    if (has_first) {
-      if ((prev_last > 0 && first_elem < 0) || (prev_last < 0 && first_elem > 0)) {
+    for (size_t i = 0; i < local_data.size() - 1; i++) {
+      if (SignChangeCheck(local_data[i], local_data[i + 1])) {
         local_count++;
       }
     }
   }
 
+  // проверка чередований между частями вектора
+  int first_elem = local_data.empty() ? 0 : local_data.front();
+  int last_elem = local_data.empty() ? 0 : local_data.back();
+
+  int prev_last = 0;
+  if (rank > 0) {
+    MPI_Recv(&prev_last, 1, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    if (!local_data.empty() && SignChangeCheck(prev_last, first_elem)) {
+      local_count++;
+    }
+  }
+
   if (rank < size - 1) {
-    int send_val = has_last ? last_elem : 0;
-    MPI_Send(&send_val, 1, MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
+    MPI_Send(&last_elem, 1, MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
   }
 
   // суммирование количества всех локальных чередований в global_count и перенаправление результата всем процессам
@@ -258,12 +250,20 @@ bool VasilievMVecSignsMPI::PostProcessingImpl() {
 ```
 Проверка на неотрицательный результат (общее число чередований >= 0).
 
+### Вспомогательная функция
+```cpp
+bool VasilievMVecSignsMPI::SignChangeCheck(int a, int b) {
+  return (a > 0 && b < 0) || (a < 0 && b > 0);
+}
+```
+Проверка на чередование знаков соседних элементов вектора.
+
 ### Особые случаи
 В данном алгоритме предполагается, что нули в векторе не влияют на чередование (например, при векторе: `-4, 0, -2`; число чередований будет равняться `0`), поэтому сравнение соседних элементов в векторе - строгое.
 
 ### Преимущества MPI-реализации
 - **Параллелизация** — каждый процесс хранит и обрабатывает только свою часть вектора, следовательно сложность обработки сокращается в `k` раз.
-- **Масштабируемость** — алгоритм будет работать все более эффективно на все более большем векторе или при увеличении числа процессов.
+- **Масштабируемость** — алгоритм будет работать все более эффективно на все более большем векторе и/или при увеличении числа процессов.
 - **Отсутствие гонок данных** — каждый процесс работает только со своими отдельными частями вектора, не затрагивая данные других процессов.
 
 ---
@@ -314,12 +314,13 @@ std::stringstream ss(line);  // создание потока для строк�
 5 тест - увеличенный вектор размером в `100` элементов, для дополнительной проверки корректности работы.
 
 ### Результаты
-**Все 5 функциональных тестов были успешно пройдены** для обеих версий (SEQ и MPI) при различном количестве процессов (1, 2, 4).
+**Все 5 функциональных тестов были успешно пройдены** для обеих версий (SEQ и MPI) при различном количестве процессов: 1, 2, 4, 6, 8 (работа проводилась на машине с 6 доступными ядрами).
 
 - Были верно подсчитаны тестовые векторы
 - Результаты обоих версий алгоритмов (SEQ, MPI) были идентичны
 - Корректна распределена нагрузка при параллельном выполнении
 - Правильная обработка нулей в векторе
+- Верная работа алгоритма при большем количестве процессов, чем частей вектора или физических ядер 
 
 ## Тесты производительности
 Для наиболее явной проверки производительности были реализованы тесты на векторе размером `10 млн.` элементов с двумя режимами измерений:
@@ -344,16 +345,30 @@ std::stringstream ss(line);  // создание потока для строк�
 
 При вычислении тестового вектора, цель которого - проверка производительности, алгоритмы так же корректно выполнили задачу и предоставили явные показатели ускорения и эффективности.
 
+## Инфраструктура для тестов
+### Виртуальная машина (VirtualBox)
+| Параметр   | Значение                                             |
+| ---------- | ---------------------------------------------------- |
+| CPU        | Intel Core i5 9400F (6 cores, 6 threads, 2900 MHz)   |
+| RAM        | 10 GB DDR4 (2660 MHz)                                |
+| OS         | Ubuntu 24.04.3 LTS                                   |
+| Compiler   | GCC 13.3.0, Release Build                            |
+
 ## Производительность
 При тестировании вектора размером `10 млн.` элементов с `~4 млн.` чередований, показатели производительности (при разных количествах процессов) были следующими:
 
 | Версия алг-ма        | Кол-во процессов | Время, с | Ускорение | Эффективность |
 |----------------------|------------------|----------|-----------|---------------|
 | SEQ                  | 1                | 0.048    | 1.00      | N/A           |
-| MPI                  | 2                | 0.033    | 1.45      | 72.7%         |
-| MPI                  | 4                | 0.021    | 2.28      | 57.1%         |
+| MPI                  | 2                | 0.032    | 1.50      | 75.0%         |
+| MPI                  | 4                | 0.020    | 2.40      | 60.0%         |
+| MPI                  | 6                | 0.018    | 2.67      | 44.5%         |
 
-Из таблицы видно, что при увеличении количества процессов время выполнения алгоритмов сокращается, а его работа ускоряется с хорошей масштабируемостью. При использовании 4 процессов, время работы было сокращено более, чем в 2 раза.
+Из таблицы видно, что при увеличении количества процессов время выполнения алгоритмов сокращается, а его работа ускоряется с хорошей масштабируемостью.
+
+При использовании 2 процессов, время работы было сокращено в 1,5 раза, при использовании 4 процессов - более, чем в 2 раза, а при использовании 6 - в 2,67 раза. Эффективность, при увеличении процессов уменьшается, вследствие синхронизаций и обменов сообщений.
+
+(При использовании 8 процеесов и флага `--oversubscribe` время работы увеличится и будет вести себя непредсказуемо, из-за использованием нескольких процессов одного физического ядра).
 
 Но следует учесть, что при тестировании на векторах размером меньше `~1 млн.` элементов, накладные затраты параллелизации перевешивают выигрыш от параллельного вычисления и в таких случаях следует использовать последовательную версию алгоритма (или меньшее количество процессов при MPI версии для достижения наименьшего возможного времени, в зависимости от размеров вектора).
 
@@ -362,6 +377,7 @@ std::stringstream ss(line);  // создание потока для строк�
 - MPI версия алгоритма эффективна для векторов больших размеров (5 млн и более).
 - SEQ версия алгоритма эффективна для векторов меньших размеров (из-за накладных расходов)
 - Хорошее масштабирование при увеличении числа процессов.
+- Корректная работа параллельной версии алгоритма при количестве процессов меньше, чем доступных ядер; такого же количества; и больше.
 - Распределение нагрузки имеет ключевую роль в увеличении эффективности работы при параллелизации.
 
 ---
@@ -414,8 +430,8 @@ using BaseTask = ppc::task::Task<InType, OutType>;
 ```cpp
 #pragma once
 
-#include "vasiliev_m_vec_signs/common/include/common.hpp"
 #include "task/include/task.hpp"
+#include "vasiliev_m_vec_signs/common/include/common.hpp"
 
 namespace vasiliev_m_vec_signs {
 
@@ -442,11 +458,10 @@ class VasilievMVecSignsSEQ : public BaseTask {
 ```cpp
 #include "vasiliev_m_vec_signs/seq/include/ops_seq.hpp"
 
-#include <numeric>
+#include <cstddef>
 #include <vector>
 
 #include "vasiliev_m_vec_signs/common/include/common.hpp"
-#include "util/include/util.hpp"
 
 namespace vasiliev_m_vec_signs {
 
@@ -509,6 +524,7 @@ class VasilievMVecSignsMPI : public BaseTask {
   bool PreProcessingImpl() override;
   bool RunImpl() override;
   bool PostProcessingImpl() override;
+  static bool SignChangeCheck(int a, int b);
 };
 
 }  // namespace vasiliev_m_vec_signs
@@ -522,11 +538,10 @@ class VasilievMVecSignsMPI : public BaseTask {
 
 #include <mpi.h>
 
-#include <numeric>
+#include <cstddef>
 #include <vector>
 
 #include "vasiliev_m_vec_signs/common/include/common.hpp"
-#include "util/include/util.hpp"
 
 namespace vasiliev_m_vec_signs {
 
@@ -547,7 +562,8 @@ bool VasilievMVecSignsMPI::PreProcessingImpl() {
 
 bool VasilievMVecSignsMPI::RunImpl() {
   auto &vec = GetInput();
-  int rank = 0, size = 1;
+  int rank = 0;
+  int size = 1;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
 
@@ -559,48 +575,39 @@ bool VasilievMVecSignsMPI::RunImpl() {
   for (int i = 0; i < remain; i++) {
     counts[i]++;
   }
-  
+
   std::vector<int> displs(size, 0);
   for (int i = 1; i < size; i++) {
     displs[i] = displs[i - 1] + counts[i - 1];
   }
-  
+
   std::vector<int> local_data(counts[rank]);
-  MPI_Scatterv(vec.data(), counts.data(), displs.data(), MPI_INT,
-              local_data.data(), counts[rank], MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Scatterv(vec.data(), counts.data(), displs.data(), MPI_INT, local_data.data(), counts[rank], MPI_INT, 0,
+               MPI_COMM_WORLD);
 
   int local_count = 0;
 
-  for (size_t i = 0; i < local_data.size() - 1; i++) {
-    if ((local_data[i] > 0 && local_data[i + 1] < 0) ||
-        (local_data[i] < 0 && local_data[i + 1] > 0)) {
-      local_count++;
-    }
-  }
-
-  int last_elem = 0;
-  int first_elem = 0;
-  bool has_first = false;
-  bool has_last = false;
   if (!local_data.empty()) {
-    first_elem = local_data.front();
-    last_elem = local_data.back();
-    has_first = has_last = true;
-  }
-
-  int prev_last = 0;
-  if (rank > 0) {
-    MPI_Recv(&prev_last, 1, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    if (has_first) {
-      if ((prev_last > 0 && first_elem < 0) || (prev_last < 0 && first_elem > 0)) {
+    for (size_t i = 0; i < local_data.size() - 1; i++) {
+      if (SignChangeCheck(local_data[i], local_data[i + 1])) {
         local_count++;
       }
     }
   }
 
+  int first_elem = local_data.empty() ? 0 : local_data.front();
+  int last_elem = local_data.empty() ? 0 : local_data.back();
+
+  int prev_last = 0;
+  if (rank > 0) {
+    MPI_Recv(&prev_last, 1, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    if (!local_data.empty() && SignChangeCheck(prev_last, first_elem)) {
+      local_count++;
+    }
+  }
+
   if (rank < size - 1) {
-    int send_val = has_last ? last_elem : 0;
-    MPI_Send(&send_val, 1, MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
+    MPI_Send(&last_elem, 1, MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
   }
 
   int global_count = 0;
@@ -609,6 +616,10 @@ bool VasilievMVecSignsMPI::RunImpl() {
   GetOutput() = global_count;
 
   return true;
+}
+
+bool VasilievMVecSignsMPI::SignChangeCheck(int a, int b) {
+  return (a > 0 && b < 0) || (a < 0 && b > 0);
 }
 
 bool VasilievMVecSignsMPI::PostProcessingImpl() {
@@ -625,22 +636,22 @@ bool VasilievMVecSignsMPI::PostProcessingImpl() {
 #include <gtest/gtest.h>
 #include <stb/stb_image.h>
 
-#include <algorithm>
 #include <array>
 #include <cstddef>
-#include <cstdint>
-#include <numeric>
+#include <fstream>
+#include <istream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <tuple>
 #include <utility>
 #include <vector>
 
+#include "util/include/func_test_util.hpp"
+#include "util/include/util.hpp"
 #include "vasiliev_m_vec_signs/common/include/common.hpp"
 #include "vasiliev_m_vec_signs/mpi/include/ops_mpi.hpp"
 #include "vasiliev_m_vec_signs/seq/include/ops_seq.hpp"
-#include "util/include/func_test_util.hpp"
-#include "util/include/util.hpp"
 
 namespace vasiliev_m_vec_signs {
 
@@ -661,11 +672,13 @@ class VasilievMVecSignsFuncTests : public ppc::util::BaseRunFuncTests<InType, Ou
     test_vectors_.clear();
     std::string line;
     while (std::getline(file, line)) {
-      if (line.empty()) continue;
+      if (line.empty()) {
+        continue;
+      }
 
       std::stringstream ss(line);
       std::vector<int> vec;
-      int val;
+      int val = 0;
       while (ss >> val) {
         vec.push_back(val);
         ss >> std::ws;
@@ -677,12 +690,12 @@ class VasilievMVecSignsFuncTests : public ppc::util::BaseRunFuncTests<InType, Ou
 
       int expected = 0;
       ss >> expected;
-      test_vectors_.push_back({vec, expected});
+      test_vectors_.emplace_back(vec, expected);
     }
   }
 
   bool CheckTestOutputData(OutType &output_data) final {
-    return expected_output_== output_data;
+    return expected_output_ == output_data;
   }
 
   InType GetTestInputData() final {
@@ -696,7 +709,7 @@ class VasilievMVecSignsFuncTests : public ppc::util::BaseRunFuncTests<InType, Ou
  private:
   std::vector<std::pair<std::vector<int>, int>> test_vectors_;
   InType input_data_;
-  OutType expected_output_;
+  OutType expected_output_ = 0;
 };
 
 namespace {
@@ -705,12 +718,9 @@ TEST_P(VasilievMVecSignsFuncTests, AlternationsInVector) {
   ExecuteTest(GetParam());
 }
 
-const std::array<TestType, 5> kTestParam = {
-    std::make_tuple(0, "case1"),
-    std::make_tuple(1, "case2"),
-    std::make_tuple(2, "case3"),
-    std::make_tuple(3, "case4"),
-    std::make_tuple(4, "case5")};
+const std::array<TestType, 5> kTestParam = {std::make_tuple(0, "case1"), std::make_tuple(1, "case2"),
+                                            std::make_tuple(2, "case3"), std::make_tuple(3, "case4"),
+                                            std::make_tuple(4, "case5")};
 
 const auto kTestTasksList =
     std::tuple_cat(ppc::util::AddFuncTask<VasilievMVecSignsMPI, InType>(kTestParam, PPC_SETTINGS_vasiliev_m_vec_signs),
@@ -733,17 +743,26 @@ INSTANTIATE_TEST_SUITE_P(SignAlternationsTests, VasilievMVecSignsFuncTests, kGte
 ```cpp
 #include <gtest/gtest.h>
 
+#include <fstream>
+#include <istream>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "util/include/perf_test_util.hpp"
+#include "util/include/util.hpp"
 #include "vasiliev_m_vec_signs/common/include/common.hpp"
 #include "vasiliev_m_vec_signs/mpi/include/ops_mpi.hpp"
 #include "vasiliev_m_vec_signs/seq/include/ops_seq.hpp"
-#include "util/include/perf_test_util.hpp"
 
 namespace vasiliev_m_vec_signs {
 
 class VasilievMVecSignsPerfTests : public ppc::util::BaseRunPerfTests<InType, OutType> {
   std::vector<std::pair<std::vector<int>, int>> test_vectors_;
   InType input_data_;
-  OutType expected_output_;
+  OutType expected_output_ = 0;
 
   void SetUp() override {
     std::string abs_path = ppc::util::GetAbsoluteTaskPath(PPC_ID_vasiliev_m_vec_signs, "perf_test_vector.txt");
@@ -755,11 +774,13 @@ class VasilievMVecSignsPerfTests : public ppc::util::BaseRunPerfTests<InType, Ou
     test_vectors_.clear();
     std::string line;
     while (std::getline(file, line)) {
-      if (line.empty()) continue;
+      if (line.empty()) {
+        continue;
+      }
 
       std::stringstream ss(line);
       std::vector<int> vec;
-      int val;
+      int val = 0;
       while (ss >> val) {
         vec.push_back(val);
         ss >> std::ws;
@@ -771,7 +792,7 @@ class VasilievMVecSignsPerfTests : public ppc::util::BaseRunPerfTests<InType, Ou
 
       int expected = 0;
       ss >> expected;
-      test_vectors_.push_back({vec, expected});
+      test_vectors_.emplace_back(vec, expected);
     }
   }
 
@@ -802,3 +823,5 @@ INSTANTIATE_TEST_SUITE_P(RunModeTests, VasilievMVecSignsPerfTests, kGtestValues,
 }  // namespace vasiliev_m_vec_signs
 
 ```
+
+
