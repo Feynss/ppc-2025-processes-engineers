@@ -17,7 +17,6 @@ class VasilievMVecSignsMPI : public BaseTask {
   bool PreProcessingImpl() override;
   bool RunImpl() override;
   bool PostProcessingImpl() override;
-  static bool SignChangeCheck(int a, int b);
 };
 
 }  // namespace vasiliev_m_vec_signs

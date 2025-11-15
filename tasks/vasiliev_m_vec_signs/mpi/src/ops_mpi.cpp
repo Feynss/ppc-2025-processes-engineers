@@ -53,7 +53,7 @@ bool VasilievMVecSignsMPI::RunImpl() {
 
   if (!local_data.empty()) {
     for (size_t i = 0; i < local_data.size() - 1; i++) {
-      if (SignChangeCheck(local_data[i], local_data[i + 1])) {
+      if ((local_data[i] > 0 && local_data[i + 1] < 0) || (local_data[i] < 0 && local_data[i + 1] > 0)) {
         local_count++;
       }
     }
@@ -65,7 +65,7 @@ bool VasilievMVecSignsMPI::RunImpl() {
   int prev_last = 0;
   if (rank > 0) {
     MPI_Recv(&prev_last, 1, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    if (!local_data.empty() && SignChangeCheck(prev_last, first_elem)) {
+    if (!local_data.empty() && ((prev_last > 0 && first_elem < 0) || (prev_last < 0 && first_elem > 0))) {
       local_count++;
     }
   }
@@ -80,10 +80,6 @@ bool VasilievMVecSignsMPI::RunImpl() {
   GetOutput() = global_count;
 
   return true;
-}
-
-bool VasilievMVecSignsMPI::SignChangeCheck(int a, int b) {
-  return (a > 0 && b < 0) || (a < 0 && b > 0);
 }
 
 bool VasilievMVecSignsMPI::PostProcessingImpl() {
