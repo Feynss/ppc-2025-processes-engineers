@@ -49,7 +49,16 @@ class VasilievMVecSignsPerfTests : public ppc::util::BaseRunPerfTests<InType, Ou
 
       int expected = 0;
       ss >> expected;
-      test_vectors_.emplace_back(vec, expected);
+
+      std::vector<int> incr_vec = vec;
+
+      for (int i = 0; i < 10; i++) {
+        incr_vec.insert(incr_vec.end(), vec.begin(), vec.end());
+      }
+
+      int expected_incr = expected * 11 + 10;
+
+      test_vectors_.emplace_back(incr_vec, expected_incr);
     }
   }
 
