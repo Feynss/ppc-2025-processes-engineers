@@ -12,6 +12,7 @@ class VasilievMVecSignsMPI : public BaseTask {
   }
   explicit VasilievMVecSignsMPI(const InType &in);
   static bool SignChangeCheck(int a, int b);
+  void calc_counts_displs(int n, int size, std::vector<int> &counts, std::vector<int> &displs);
 
  private:
   bool ValidationImpl() override;

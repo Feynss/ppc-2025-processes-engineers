@@ -37,17 +37,7 @@ bool VasilievMVecSignsMPI::RunImpl() {
   std::vector<int> displs(size);
 
   if (rank == 0) {
-    int chunk = n / size;
-    int remain = n % size;
-
-    for (int i = 0; i < size; i++) {
-      counts[i] = chunk + (i < remain ? 1 : 0);
-    }
-
-    displs[0] = 0;
-    for (int i = 1; i < size; i++) {
-      displs[i] = displs[i - 1] + counts[i - 1];
-    }
+    calc_counts_displs(n, size, counts, displs);
   }
 
   MPI_Bcast(counts.data(), size, MPI_INT, 0, MPI_COMM_WORLD);
@@ -88,6 +78,20 @@ bool VasilievMVecSignsMPI::RunImpl() {
   GetOutput() = global_count;
 
   return true;
+}
+
+void VasilievMVecSignsMPI::calc_counts_displs(int n, int size, std::vector<int> &counts, std::vector<int> &displs) {
+  int chunk = n / size;
+  int remain = n % size;
+
+  for (int i = 0; i < size; i++) {
+    counts[i] = chunk + (i < remain ? 1 : 0);
+  }
+
+  displs[0] = 0;
+  for (int i = 1; i < size; i++) {
+    displs[i] = displs[i - 1] + counts[i - 1];
+  }
 }
 
 bool VasilievMVecSignsMPI::SignChangeCheck(int a, int b) {
