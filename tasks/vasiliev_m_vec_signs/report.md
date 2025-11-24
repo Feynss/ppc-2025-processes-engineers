@@ -144,7 +144,7 @@ namespace vasiliev_m_vec_signs {
     }
     explicit VasilievMVecSignsMPI(const InType &in);
     static bool SignChangeCheck(int a, int b); // отдельная функция для проверки двух соседних элементов
-    void calc_counts_displs(int n, int size, std::vector<int> &counts, std::vector<int> &displs);  // вычисление кол-ва элементов на процесс и смещения в векторе
+    static void CalcCountsAndDispls(int n, int size, std::vector<int> &counts, std::vector<int> &displs);  // вычисление кол-ва элементов на процесс и смещения в векторе
   
    private:
     bool ValidationImpl() override;
@@ -198,7 +198,7 @@ bool VasilievMVecSignsMPI::RunImpl() {
 
   // вычисления counts и displs происходят только на root-ранге
   if (rank == 0) {
-    calc_counts_displs(n, size, counts, displs);  // распределение частей вектора между процессами
+    CalcCountsAndDispls(n, size, counts, displs);  // распределение частей вектора между процессами
   }
 
   MPI_Bcast(counts.data(), size, MPI_INT, 0, MPI_COMM_WORLD);  // рассылка counts и displs всем процессам
@@ -264,7 +264,7 @@ bool VasilievMVecSignsMPI::SignChangeCheck(int a, int b) {
 Проверка на чередование знаков соседних элементов вектора.
 
 ```cpp
-void VasilievMVecSignsMPI::calc_counts_displs(int n, int size, std::vector<int> &counts, std::vector<int> &displs) {
+void VasilievMVecSignsMPI::CalcCountsAndDispls(int n, int size, std::vector<int> &counts, std::vector<int> &displs) {
   int chunk = n / size;
   int remain = n % size;
 
@@ -531,6 +531,8 @@ bool VasilievMVecSignsSEQ::PostProcessingImpl() {
 ```cpp
 #pragma once
 
+#include <vector>
+
 #include "task/include/task.hpp"
 #include "vasiliev_m_vec_signs/common/include/common.hpp"
 
@@ -543,7 +545,7 @@ class VasilievMVecSignsMPI : public BaseTask {
   }
   explicit VasilievMVecSignsMPI(const InType &in);
   static bool SignChangeCheck(int a, int b);
-  void calc_counts_displs(int n, int size, std::vector<int> &counts, std::vector<int> &displs);
+  static void CalcCountsAndDispls(int n, int size, std::vector<int> &counts, std::vector<int> &displs);
 
  private:
   bool ValidationImpl() override;
@@ -598,7 +600,7 @@ bool VasilievMVecSignsMPI::RunImpl() {
   std::vector<int> displs(size);
 
   if (rank == 0) {
-    calc_counts_displs(n, size, counts, displs);
+    CalcCountsAndDispls(n, size, counts, displs);
   }
 
   MPI_Bcast(counts.data(), size, MPI_INT, 0, MPI_COMM_WORLD);
@@ -641,7 +643,7 @@ bool VasilievMVecSignsMPI::RunImpl() {
   return true;
 }
 
-void VasilievMVecSignsMPI::calc_counts_displs(int n, int size, std::vector<int> &counts, std::vector<int> &displs) {
+void VasilievMVecSignsMPI::CalcCountsAndDispls(int n, int size, std::vector<int> &counts, std::vector<int> &displs) {
   int chunk = n / size;
   int remain = n % size;
 

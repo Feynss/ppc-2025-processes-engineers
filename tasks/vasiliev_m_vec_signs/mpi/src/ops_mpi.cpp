@@ -37,7 +37,7 @@ bool VasilievMVecSignsMPI::RunImpl() {
   std::vector<int> displs(size);
 
   if (rank == 0) {
-    calc_counts_displs(n, size, counts, displs);
+    CalcCountsAndDispls(n, size, counts, displs);
   }
 
   MPI_Bcast(counts.data(), size, MPI_INT, 0, MPI_COMM_WORLD);
@@ -80,7 +80,7 @@ bool VasilievMVecSignsMPI::RunImpl() {
   return true;
 }
 
-void VasilievMVecSignsMPI::calc_counts_displs(int n, int size, std::vector<int> &counts, std::vector<int> &displs) {
+void VasilievMVecSignsMPI::CalcCountsAndDispls(int n, int size, std::vector<int> &counts, std::vector<int> &displs) {
   int chunk = n / size;
   int remain = n % size;
 
