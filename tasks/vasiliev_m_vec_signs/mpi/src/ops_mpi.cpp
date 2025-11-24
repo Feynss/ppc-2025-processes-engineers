@@ -25,25 +25,33 @@ bool VasilievMVecSignsMPI::PreProcessingImpl() {
 }
 
 bool VasilievMVecSignsMPI::RunImpl() {
-  auto &vec = GetInput();
   int rank = 0;
   int size = 1;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
 
+  auto &vec = GetInput();
   int n = static_cast<int>(vec.size());
-  int chunk = n / size;
-  int remain = n % size;
 
-  std::vector<int> counts(size, chunk);
-  for (int i = 0; i < remain; i++) {
-    counts[i]++;
+  std::vector<int> counts(size);
+  std::vector<int> displs(size);
+
+  if (rank == 0) {
+    int chunk = n / size;
+    int remain = n % size;
+
+    for (int i = 0; i < size; i++) {
+      counts[i] = chunk + (i < remain ? 1 : 0);
+    }
+
+    displs[0] = 0;
+    for (int i = 1; i < size; i++) {
+      displs[i] = displs[i - 1] + counts[i - 1];
+    }
   }
 
-  std::vector<int> displs(size, 0);
-  for (int i = 1; i < size; i++) {
-    displs[i] = displs[i - 1] + counts[i - 1];
-  }
+  MPI_Bcast(counts.data(), size, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(displs.data(), size, MPI_INT, 0, MPI_COMM_WORLD);
 
   std::vector<int> local_data(counts[rank]);
   MPI_Scatterv(vec.data(), counts.data(), displs.data(), MPI_INT, local_data.data(), counts[rank], MPI_INT, 0,
